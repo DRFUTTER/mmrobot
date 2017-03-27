@@ -1,0 +1,3 @@
+/home/josue/SmartMotor/TestSerial/build/CMakeFiles/rebuild_cache.dir
+/home/josue/SmartMotor/TestSerial/build/CMakeFiles/edit_cache.dir
+/home/josue/SmartMotor/TestSerial/build/CMakeFiles/testSmartMotor.dir
