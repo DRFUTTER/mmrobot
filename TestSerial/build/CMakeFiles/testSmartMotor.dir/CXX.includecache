@@ -42,25 +42,13 @@ stdio.h
 string.h
 -
 
-/home/josue/SmartMotor/TestSerial/src/smartmotor.cpp
-smartmotor.h
-/home/josue/SmartMotor/TestSerial/src/smartmotor.h
-rs232.h
-/home/josue/SmartMotor/TestSerial/src/rs232.h
-string
--
-iostream
--
-ostream
--
-
-/home/josue/SmartMotor/TestSerial/src/testCom.cpp
+/home/josue/mmrobot/TestSerial/src/testCom.cpp
 iostream
 -
 unistd.h
 -
 smartmotor.h
-/home/josue/SmartMotor/TestSerial/src/smartmotor.h
+/home/josue/mmrobot/TestSerial/src/smartmotor.h
 rs232.h
-/home/josue/SmartMotor/TestSerial/src/rs232.h
+/home/josue/mmrobot/TestSerial/src/rs232.h
 

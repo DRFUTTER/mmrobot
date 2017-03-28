@@ -7,13 +7,15 @@
 int SmartMotor::count = 0;        //Initialize the count to 0
 int SmartMotor::MaxAddress = 128; //Initialize the MaxAddress to 128
 int SmartMotor::cport_nr = 0;     //Use ttyS0 as default
-int addrSleepTime = 100 * 1000;   //100ms between SADDR=
-int readSleepTime = 100 * 1000;   //100ms to wait for data
-int commandSleepTime = 50000;     //10ms to wait after sending each command
+int addrSleepTime = 100 * 1000;   //100ms
+int waitSleepTime = 100 * 1000;   //100ms to wait for data
+int commandSleepTime = 1800;      //1.8ms to wait after sending each command
 
 char writeBuffer[40];         //Buffer to send data to serial port
 unsigned char readBuffer[40]; //Buffer to receive data from serial port
 char addrFlag[20];            //A comparisson char
+
+int readBytes;
 
 //Constructor
 SmartMotor::SmartMotor(int address, int countsPerRev)
@@ -89,10 +91,10 @@ int SmartMotor::addressMotors()
         sprintf(addrFlag, "RADDR\r1\r"); //RADR1 checks all the motors have been addressed
 
         //Read the data
-        int nBytes = RS232_PollComport(cport_nr, readBuffer, 50);
-        if (nBytes > 0)
+        readBytes = RS232_PollComport(cport_nr, readBuffer, 50);
+        if (readBytes > 0)
         {
-            readBuffer[nBytes] = 0; //put null at the end of the string
+            readBuffer[readBytes] = 0; //put null at the end of the string
         }
         else
         {
@@ -100,7 +102,7 @@ int SmartMotor::addressMotors()
         }
 
         //Check byte by byte the contents of the read data
-        for (int i = 0; i <= nBytes; i++)
+        for (int i = 0; i <= readBytes; i++)
         {
             printf("%d %d\n", addrFlag[i], (char)readBuffer[i]);
         }
@@ -131,10 +133,10 @@ int SmartMotor::CheckMotorsAddress()
     sprintf(addrFlag, "RADDR\r1\r"); //RADR1 checks all the motors have been addressed
 
     //Read the data
-    int nBytes = RS232_PollComport(cport_nr, readBuffer, 50);
-    if (nBytes > 0)
+    int readBytes = RS232_PollComport(cport_nr, readBuffer, 50);
+    if (readBytes > 0)
     {
-        readBuffer[nBytes] = 0; //put null at the end of the string
+        readBuffer[readBytes] = 0; //put null at the end of the string
     }
     else
     {
@@ -142,7 +144,7 @@ int SmartMotor::CheckMotorsAddress()
     }
 
     //Check byte by byte the contents of the read data
-    for (int i = 0; i <= nBytes; i++)
+    for (int i = 0; i <= readBytes; i++)
     {
         printf("%d %d\n", addrFlag[i], (char)readBuffer[i]);
     }
@@ -160,90 +162,77 @@ int SmartMotor::CheckMotorsAddress()
 //Initialize the motor and clear error flags
 int SmartMotor::initialize(int lowLimit, int highLimit)
 {
-    //Erase the write buffer
-    memset(&writeBuffer[0], 0, sizeof writeBuffer);
-    //Erase the read buffer
-    memset(&readBuffer[0], 0, sizeof readBuffer);
+    char wrBuffer[25];          //Buffer to send data to serial port
+    unsigned char rdBuffer[25]; //Buffer to receive data from serial port
+    //Clear data from the arrays
+    for (int i = 0; i < 25; i++)
+    {
+        wrBuffer[i] = 0;
+    }
+    for (int i = 0; i < 25; i++)
+    {
+        rdBuffer[i] = 0;
+    }
 
-    //int cport_nr = this->cport_nr;
     //Disable the low and high limits
     //!!!!!!!!!!!!!!!Check the limits for position mode!!!!!!!!!!!!!!!!!!! (TO DO TASK)
     //disable limit & reset errors
-    printf("Initialazing motor %d...\n", this->address);
+    printf("Initialazing motor %d...\n", this->address - 128);
 
     RS232_SendByte(cport_nr, this->address);
-    sprintf(writeBuffer, "EIGN(2) EIGN(3) ZS\r");
-    RS232_cputs(cport_nr, writeBuffer);
+    sprintf(wrBuffer, "EIGN(2) EIGN(3) ZS\r");
+    RS232_cputs(cport_nr, wrBuffer);
 
     //RS232_cputs(cport_nr, "EIGN(2) EIGN(3) ZS\r");
-    printf("sent: %d%s\n", this->address, writeBuffer);
-    
+    printf("sent: %d%s\n", this->address, wrBuffer);
+
+    //Read the ECHO data
     usleep(1000000); //Wait one second to initialize
-    
-    //Read back the command because of ECHO, instead of waiting some time
-    int len = static_cast<int>(strlen(writeBuffer)) + 1;
+    int len = static_cast<int>(strlen(wrBuffer)) + 1;
 
     printf("Length: %d\n", len);
 
     while (RS232_availableBytes(cport_nr) < len)
     {
-
     }
-    RS232_PollComport(cport_nr, readBuffer, len);
-    printf("%s\n", readBuffer);
+    RS232_PollComport(cport_nr, rdBuffer, len);
+    printf("%s\n", rdBuffer);
 }
 
 //Set position mode
-void SmartMotor::setPositionMode(int accel, int vel)
+int SmartMotor::setPositionMode(int accel, int vel)
 {
-    //Erase the write buffer
-    memset(&writeBuffer[0], 0, sizeof writeBuffer);
-    //Erase the read buffer
-    memset(&readBuffer[0], 0, sizeof readBuffer);
+    char wrBuffer[20];          //Buffer to send data to serial port
+    unsigned char rdBuffer[20]; //Buffer to receive data from serial port
+
+    //Clear data from the arrays
+    for (int i = 0; i < 20; i++)
+    {
+        wrBuffer[i] = 0;
+    }
+    for (int i = 0; i < 20; i++)
+    {
+        rdBuffer[i] = 0;
+    }
 
     //Send the data
     RS232_SendByte(cport_nr, this->address);
-    sprintf(writeBuffer, "MP ADT=%d VT=%d G\r",accel, vel);
-    RS232_cputs(cport_nr, writeBuffer);
-    printf("sent: %d%s\n", this->address, writeBuffer);
-
-    //Read back the command because of ECHO, instead of waiting some time
-    usleep(1000000); //Wait for an answer
-    
-    
-    //Read back the command because of ECHO, instead of waiting some time
-    int len = static_cast<int>(strlen(writeBuffer)) + 1;
-    printf("Length: %d\n", len);
-    while (RS232_availableBytes(cport_nr) < len)
-    {
-
-    }
-    RS232_PollComport(cport_nr, readBuffer, len);
-    printf("%s\n", readBuffer);
-}
-
-//Send the position
-int SmartMotor::sendPosition(long position)
-{
-    char wrBuffer[40];         //Buffer to send data to serial port
-    unsigned char rdBuffer[40]; //Buffer to receive data from serial port
-
-    RS232_SendByte(cport_nr, this->address);
-    sprintf(wrBuffer, "PT=%ld G\r", position);
+    sprintf(wrBuffer, "MP ADT=%d VT=%d G\r", accel, vel);
     RS232_cputs(cport_nr, wrBuffer);
 
+    //Get the size of the write buffer
     int len = static_cast<int>(strlen(wrBuffer)) + 1;
     printf("Length: %d\n", len);
     printf("sent: %d%s\n", this->address, wrBuffer);
 
-    usleep(commandSleepTime); //Give some time to answer
     //Read the ECHO data
+    usleep(waitSleepTime); //Wait some time for the answer
     int checkCount = 0;
     while (RS232_availableBytes(cport_nr) < len)
     {
         usleep(500);
         checkCount++;
-        if(checkCount>30)
+        if (checkCount > 30)
             break;
     }
     RS232_PollComport(cport_nr, rdBuffer, len);
@@ -251,73 +240,145 @@ int SmartMotor::sendPosition(long position)
     return 0;
 }
 
-//Set velocity mode
-void SmartMotor::setVelocityMode(int accel)
+//Send the position
+int SmartMotor::sendPosition(long position)
 {
-    //Erase the write buffer
-    memset(&writeBuffer[0], 0, sizeof writeBuffer);
-    //Erase the read buffer
-    memset(&readBuffer[0], 0, sizeof readBuffer);
+    char wrBuffer[20];          //Buffer to send data to serial port
+    unsigned char rdBuffer[20]; //Buffer to receive data from serial port
+    //Clear data from the arrays
+    for (int i = 0; i < 20; i++)
+    {
+        wrBuffer[i] = 0;
+    }
+    for (int i = 0; i < 20; i++)
+    {
+        rdBuffer[i] = 0;
+    }
+
+    RS232_SendByte(cport_nr, this->address);
+    sprintf(wrBuffer, "PT=%ld G\r", position);
+    RS232_cputs(cport_nr, wrBuffer);
+
+    //Get the size of the write buffer
+    int len = static_cast<int>(strlen(wrBuffer)) + 1;
+    printf("Length: %d\n", len);
+    printf("sent: %d%s\n", this->address, wrBuffer);
+
+    //Read the ECHO data
+    usleep(commandSleepTime); //Give some time to answer
+    int checkCount = 0;
+    while (RS232_availableBytes(cport_nr) < len)
+    {
+        usleep(500);
+        checkCount++;
+        if (checkCount > 30)
+            break;
+    }
+    readBytes = RS232_PollComport(cport_nr, rdBuffer, len);
+    if (readBytes < len) //If the data was not read correctly
+    {
+        return 1;
+    }
+    printf("%s\n", rdBuffer);
+    return 0;
+}
+
+//Set velocity mode
+int SmartMotor::setVelocityMode(int accel)
+{
+    char wrBuffer[20];          //Buffer to send data to serial port
+    unsigned char rdBuffer[20]; //Buffer to receive data from serial port
+
+    //Clear data from the arrays
+    for (int i = 0; i < 20; i++)
+    {
+        wrBuffer[i] = 0;
+    }
+    for (int i = 0; i < 20; i++)
+    {
+        rdBuffer[i] = 0;
+    }
 
     //Send the data
     RS232_SendByte(cport_nr, this->address);
-    sprintf(writeBuffer, "MV ADT=%d G\r",accel);
-    RS232_cputs(cport_nr, writeBuffer);
-        
-    //Read back the command because of ECHO, instead of waiting some time
-    usleep(1000000); //Wait for an answer
+    sprintf(wrBuffer, "MV ADT=%d G\r", accel);
+    RS232_cputs(cport_nr, wrBuffer);
 
-    printf("sent: %d%s\n", this->address, writeBuffer);
-    
-    //Read back the command because of ECHO, instead of waiting some time
-    int len = static_cast<int>(strlen(writeBuffer)) + 1;
-
+    //Get the size of the write buffer
+    int len = static_cast<int>(strlen(wrBuffer)) + 1;
     printf("Length: %d\n", len);
+    printf("sent: %d%s\n", this->address, wrBuffer);
 
+    //Read back the command because of ECHO, instead of waiting some time
+    usleep(waitSleepTime); //Wait for an answer
+    int checkCount = 0;
     while (RS232_availableBytes(cport_nr) < len)
     {
-
+        usleep(100);
+        checkCount++;
+        if (checkCount > 30)
+            break;
     }
-    RS232_PollComport(cport_nr, readBuffer, len);
-    printf("%s\n", readBuffer);
+    usleep(500);
+    readBytes = RS232_PollComport(cport_nr, rdBuffer, len);
+    if (readBytes < len) //If the data was not read correctly
+    {
+        return 1;
+    }
+    printf("%s\n", rdBuffer);
+    return 0;
 }
 
 //Send the velocity
 int SmartMotor::sendVelocity(int rpm)
 {
-    //Erase the write buffer
-    memset(&writeBuffer[0], 0, sizeof writeBuffer);
-    //Erase the read buffer
-    memset(&readBuffer[0], 0, sizeof readBuffer);
+    char wrBuffer[20];          //Buffer to send data to serial port
+    unsigned char rdBuffer[20]; //Buffer to receive data from serial port
+    //Clear data from the arrays
+    for (int i = 0; i < 20; i++)
+    {
+        wrBuffer[i] = 0;
+    }
+    for (int i = 0; i < 20; i++)
+    {
+        wrBuffer[i] = 0;
+    }
+    for (int i = 0; i < 20; i++)
+    {
+        rdBuffer[i] = 0;
+    }
 
-    //RS232_flushRX(cport_nr);
     int vt = (int)(rpm * this->velGain);
     RS232_SendByte(cport_nr, this->address);
-    sprintf(writeBuffer, "VT=%d G\r", vt);
-    RS232_cputs(cport_nr, writeBuffer);
+    sprintf(wrBuffer, "VT=%d G\r", vt);
+    RS232_cputs(cport_nr, wrBuffer);
 
-    //size_t len = strlen(writeBuffer);
-    int len = static_cast<int>(strlen(writeBuffer)) + 1;
-
+    int len = static_cast<int>(strlen(wrBuffer)) + 1;
     printf("Length: %d\n", len);
-    //usleep(commandSleepTime); //Give some time to answer
-
-    int countRead = 0;
-    unsigned char c = 0;
+    printf("sent: %d%s\n", this->address, wrBuffer);
 
     //Read the ECHO data
+    usleep(commandSleepTime); //Give some time to answer
+    int checkCount = 0;
     while (RS232_availableBytes(cport_nr) < len)
     {
-
+        usleep(100);
+        checkCount++;
+        if (checkCount > 20)
+            break;
     }
-    RS232_PollComport(cport_nr, readBuffer, len);
-    printf("sent: VT=%d G\n", vt);
-    printf("%s\n", readBuffer);
+    usleep(500); //Small delay before reading
+    readBytes = RS232_PollComport(cport_nr, rdBuffer, len);
+    if (readBytes < len) //If the data was not read correctly
+    {
+        return 1;
+    }
+    printf("%s\n", rdBuffer);
     return 0;
 }
 
 //Set torque mode
-void SmartMotor::setTorqueMode()
+int SmartMotor::setTorqueMode()
 {
     //TO DO TASK
 
@@ -345,7 +406,6 @@ void SmartMotor::stop()
     RS232_cputs(cport_nr, writeBuffer);
     usleep(commandSleepTime); //Give some time to answer
     //Read back the command because of ECHO, instead of waiting some time
-    
 }
 
 void SmartMotor::sendCommandAll(const char *command)
@@ -393,138 +453,108 @@ void SmartMotor::sendCommand(const char *command)
 char number[11];
 int SmartMotor::readEncoders(long *newTicks)
 {
-    //RS232_flushRX(cport_nr);
-    usleep(2000);
-    this->sendCommand("RPA");
-    unsigned char c = 0;
-    memset(&readBuffer[0], 0, sizeof readBuffer);
-    int readBytes;
-    int compFlag = -1;
-    int address = 0;
-    int countRead = 0;
+    char wrBuffer[20];          //Buffer to send data to serial port
+    unsigned char rdBuffer[25]; //Buffer to receive data from serial port
+    char data[25];
 
-    /*
-    //Read the address
-    while (RS232_availableBytes(cport_nr) < 3)
+    //Clear data from the arrays
+    for (int i = 0; i < 20; i++)
     {
+        wrBuffer[i] = 0;
     }
-    while (!(c >= 128 && c <= this->MaxAddress))
+    for (int i = 0; i < 25; i++)
     {
-        if (RS232_PollComport(cport_nr, &c, 1) == 0)
+        rdBuffer[i] = 0;
+    }
+    for (int i = 0; i < 25; i++)
+    {
+        data[i] = 0;
+    }
+
+    RS232_SendByte(cport_nr, this->address);
+    sprintf(wrBuffer, "RPA ");
+    RS232_cputs(cport_nr, wrBuffer);
+
+    int len = static_cast<int>(strlen(wrBuffer)) + 1;
+    printf("Length: %d\n", len);
+    printf("sent: %d%s\n", this->address, wrBuffer);
+
+    //Read the ECHO data
+    usleep(commandSleepTime); //Give some time to answer
+    int checkCount = 0;
+    while (RS232_availableBytes(cport_nr) < len + 2) //Read at least (address)RPA 0\r
+    {
+        usleep(100);
+        checkCount++;
+        if (checkCount > 30)
+            break;
+    }
+    usleep(500); //Small delay before reading
+    readBytes = RS232_PollComport(cport_nr, rdBuffer, 25);
+    if (readBytes < len)
+    {
+        printf("Error reading data\n");
+        return 1;
+    }
+    printf("%s\n", rdBuffer);
+
+    if (rdBuffer[0] == this->address) //Check right address in first character
+    {
+        for (int i = 5; i < readBytes; i++)
         {
-            usleep(1000);
-            countRead++;
-            if (countRead > 5) //In case it gets stuck reading
+            if (rdBuffer[i] != '\r')
             {
-                RS232_flushRX(cport_nr);
-                return 1; //Error reading
+                data[i - 5] = (char)rdBuffer[i];
             }
+            else
+            {
+                data[i - 5] = 0; //add the null character
+                break;
+            }
+        }
+        *newTicks = atol(data);
+        printf("Enc: %ld\n", *newTicks);
+    }
+    else //Otherwise try a different approach to read the enconder
+    {
+        printf("Wrong address: %d\n", rdBuffer[0]);
+        //Check last character is '\r' before processing the data
+        if (rdBuffer[readBytes - 1] == 13)
+        {
+            int i = 0;
+            //Read until the address
+            while (true)
+            {
+                if (rdBuffer[i] == this->address)
+                {
+                    break;
+                }
+                i++;
+            }
+
+            int k = 0;
+            //Then try to read the data
+            while (rdBuffer[i] != 13)
+            {
+                printf("%d ", rdBuffer[i]);
+                if (rdBuffer[i] >= 48 && rdBuffer[i] <= 57) //Just get the numbers
+                {
+                    data[k] = (char)rdBuffer[i];
+                    k++;
+                }
+                i++;
+            }
+            printf("\n");
+            data[k] = 0; //Add the null character
+            printf("Data: %s\n", data);
+            *newTicks = atol(data);
+            printf("Enc: %ld\n", *newTicks);
         }
         else
         {
-            if (c == 0)
-            {
-                RS232_flushRX(cport_nr);
-                return 1; //Error reading
-            }
+            return 1;
         }
-        printf("%d ", c);
     }
-    printf("\n");
-    countRead = 0;
-    usleep(1000);
 
-    address = c - 128;
-    readBytes = RS232_ReadUntil(cport_nr, readBuffer, '\r');
-    printf("RAP_Read: %s\n", readBuffer);
-
-    //Check if the receive data is the RPA command answer
-    compFlag = strncmp("RPA ", (char *)readBuffer, 4);
-    if (compFlag == 0)
-    {
-    }
-    else //If not read again until next terminator
-    {
-        while (RS232_availableBytes(cport_nr) < 1)
-        {
-            sleep(110);
-            printf("Stuck here...2\n");
-        }
-        countRead = 0;
-        while (!(c >= 128 && c <= this->MaxAddress))
-        {
-            RS232_PollComport(cport_nr, &c, 1);
-            usleep(110);
-            countRead++;
-            if (countRead > 20) //In case it gets stuck reading
-            {
-                return 1; //Error reading
-            }
-        }
-        address = c - 128;
-        memset(&readBuffer[0], 0, sizeof readBuffer);
-        readBytes = RS232_ReadUntil(cport_nr, readBuffer, '\r');
-
-        //Check if the receive data is the RPA command answer
-        compFlag = strncmp("RPA", (char *)readBuffer, 3);
-    }
-    
-    if (compFlag == 0)
-    {
-        int n = 4;
-        memset(&number[0], 0, sizeof number);
-        while (c != '\r')
-        {
-            c = readBuffer[n];
-            if (c != '\r')
-            {
-                number[n - 4] = (char)c;
-                n++;
-            }
-        }
-        number[n + 1] = 0;
-        *newTicks = atol(number);
-        printf("Number: %ld\n", *newTicks);
-        return 0;
-    }
-    else
-    {
-        return 2;
-    }*/
-
-    
-    printf("\n");
+    return 0;
 }
-
-/*
-unsigned char c = 1;
-    int n = 0;
-
-    int readBytes;
-    int readFlag = 1;
-    int countDel = 0;
-    //Read the available data from the serial port
-    while (readFlag)
-    {
-        readBytes = RS232_PollComport(cport_nr, &c, 1);
-        if (readBytes != 0)
-        {
-            printf("%d %c\n", c, c);
-            //readBuffer[n] = c;
-            n++;
-            if (c == '\r')
-            {
-                countDel++;
-            }
-            if (countDel == 2)
-            {
-                readFlag = 0;
-            }
-        }
-        else
-        {
-            //usleep(100);
-        }
-    }
-    printf("\n");
-*/

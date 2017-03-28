@@ -1,1 +1,1 @@
-/usr/bin/c++      CMakeFiles/testSmartMotor.dir/src/testCom.cpp.o CMakeFiles/testSmartMotor.dir/src/rs232.c.o CMakeFiles/testSmartMotor.dir/src/smartmotor.cpp.o  -o ../testSmartMotor -rdynamic 
+/usr/bin/c++       CMakeFiles/testSmartMotor.dir/src/testCom.cpp.o CMakeFiles/testSmartMotor.dir/src/rs232.c.o CMakeFiles/testSmartMotor.dir/src/smartmotor.cpp.o  -o ../testSmartMotor -rdynamic 

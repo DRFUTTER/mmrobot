@@ -28,9 +28,9 @@ class SmartMotor
         static void sendCommandAll(const char* command);
         
         //Methods to set the different modes
-        void setPositionMode(int accel, int vel);
-        void setVelocityMode(int accel);
-        void setTorqueMode();
+        int setPositionMode(int accel, int vel);
+        int setVelocityMode(int accel);
+        int setTorqueMode();
 
         //Methods to send the parameters for each mode
         int sendPosition(long position);

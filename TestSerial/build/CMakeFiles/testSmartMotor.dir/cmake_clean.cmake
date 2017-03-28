@@ -1,4 +1,4 @@
-file(REMOVE_RECURSE
+FILE(REMOVE_RECURSE
   "CMakeFiles/testSmartMotor.dir/src/testCom.cpp.o"
   "CMakeFiles/testSmartMotor.dir/src/rs232.c.o"
   "CMakeFiles/testSmartMotor.dir/src/smartmotor.cpp.o"
@@ -7,6 +7,6 @@ file(REMOVE_RECURSE
 )
 
 # Per-language clean rules from dependency scanning.
-foreach(lang C CXX)
-  include(CMakeFiles/testSmartMotor.dir/cmake_clean_${lang}.cmake OPTIONAL)
-endforeach()
+FOREACH(lang C CXX)
+  INCLUDE(CMakeFiles/testSmartMotor.dir/cmake_clean_${lang}.cmake OPTIONAL)
+ENDFOREACH(lang)
