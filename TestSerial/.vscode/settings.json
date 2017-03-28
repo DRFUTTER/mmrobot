@@ -4,6 +4,8 @@
         "array": "cpp",
         "condition_variable": "cpp",
         "chrono": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "slist": "cpp",
+        "initializer_list": "cpp"
     }
 }
