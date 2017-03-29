@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "iostream": "cpp",
-        "*.ipp": "cpp",
-        "chrono": "cpp",
-        "functional": "cpp",
-        "array": "cpp"
-    }
-}
