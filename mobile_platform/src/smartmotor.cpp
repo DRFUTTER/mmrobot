@@ -28,13 +28,13 @@ int dataLen = 25;
 int readBytes;
 
 //Constructor
-SmartMotor::SmartMotor(int address, int resolution, int samplingRate, float maxRPM)
+SmartMotor::SmartMotor(int address, int resolution, int samplingRate, float maxRPS)
 {
     this->address = 128 + address;
     this->res = resolution;
     this->samp = samplingRate;
-    this->velGain = (float)resolution / samplingRate * 65536.0; //Page 22 UserGuide v523
-    this->maxVT = (int)(maxRPM / 60.0 * this->velGain);
+    this->velGain = (float)resolution / samplingRate * 65536.0; //For velocity in rev/sec (Page 22 UserGuide v523 )
+    this->maxVT = (int)(maxRPS * this->velGain);
     this->lastTicks = 0;
     this->currTicks = 0;
     count++; //Add one motor to the count variable
@@ -317,7 +317,7 @@ int SmartMotor::sendVelocity(float revPerSec)
         else
             vt = -1 * this->maxVT;
 
-        printf("Maximum velocity reached. Using maximum velocity: %.2fRPM\n", vt * 60.0 / this->velGain);
+        printf("Maximum velocity reached. Using maximum velocity: %.2fRPS\n", vt / this->velGain);
     }
 
     //Clear data from write buffer

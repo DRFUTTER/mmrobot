@@ -22,7 +22,7 @@ class SmartMotor
     long currTicks;         //current encoder value
     float vel;              //Current velocity in rev/sec
   public:
-    SmartMotor(int address, int resolution, int samplingRate, float maxRevPerMin);
+    SmartMotor(int address, int resolution, int samplingRate, float maxRevPerSec);
     long getLastTicks()
     {
         return lastTicks;

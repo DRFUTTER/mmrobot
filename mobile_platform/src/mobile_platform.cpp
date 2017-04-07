@@ -3,31 +3,64 @@
 #include <mobile_platform/smartmotor.h>
 #include <mobile_platform/rs232.h>
 #include "ros/ros.h"
-#include <mobile_platform/Vels.h>
+#include <geometry_msgs/Twist.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+//#include <mobile_platform/Vels.h>
 
 using namespace std;
 
-int portN = 0; //Serial Port ID
+int portN = 0;  //Serial Port ID
+float L = 0.42; //Distance between the wheels
+float Lby2 = L / 2.0;
+float wheelRadius = 0.075;
+float gearRatio = 10.0;    //Gear box ratio in each motor
+float revToRad = 2 * M_PI; //Constant to transform from rev/sec to rad/sec
 
 //The motor must be a global variable for the function call back to see it
-SmartMotor motor_L(1, 4000, 8000, 800.0); //Address=2, CountsPerRev=4000, Sampling Rate=8000Hz, MaxRPM = 800
-SmartMotor motor_R(2, 4000, 8000, 800.0); //Address=1, CountsPerRev=4000, Sampling Rate=8000Hz, MaxRPM = 800
-SmartMotor motor_Z(3, 8000, 8000, 10.0);  //Address=1, CountsPerRev=8000, Sampling Rate=8000Hz, MaxRPM = 800
+SmartMotor motor_L(1, 4000, 8000, 5.6); //Address=1, CountsPerRev=4000, Sampling Rate=8000Hz, MaxRPS = 28 for a 0.2rad/sec mobile platform turn
+SmartMotor motor_R(2, 4000, 8000, 5.6); //Address=2, CountsPerRev=4000, Sampling Rate=8000Hz, MaxRPS = 28 for a 0.2rad/sec mobile platform turn
+SmartMotor motor_Z(3, 8000, 8000, 0.4); //Address=3, CountsPerRev=8000, Sampling Rate=8000Hz, MaxRPS = 0.4
+
+void twistToWheelsVels(float linearVel, float angularVel, float *Rvel, float *Lvel)
+{
+    //First calculate the linear velocity of each wheel
+    float linVelR = linearVel + angularVel * Lby2; //angular velocity in rad/sec
+    float linVelL = linearVel - angularVel * Lby2; //angular velocity in rad/sec
+
+    //Then calculate the angular velocity of each wheel
+    *Rvel = gearRatio * linVelR / (revToRad * wheelRadius);        //Multiply by gear ratio an transform to rev/sec
+    *Lvel = -1.0 * gearRatio * linVelL / (revToRad * wheelRadius); //Times -1 becase the rotation is opposite
+}
+
+void wheelsVelsToTwist(float Rvel, float Lvel, float *linearVel, float *angularVel)
+{
+    //First calculate the linear velocity of each wheel
+    float linVelR = (Rvel * revToRad * wheelRadius) / gearRatio;      //Transform to angular velocity to rad/sec and also divide by gear ratio
+    float linVelL = -1 * (Lvel * revToRad * wheelRadius) / gearRatio; //Times -1 because the rotation is opposite
+
+    //Then calculate the linear and angular velocity of the mobile platform
+    *linearVel = (linVelR + linVelL) * 0.5;
+    *angularVel = (linVelR - linVelL) / L; //angular velocity in rad/sec
+}
 
 //Callback function for subscriber
-void cmdVelCallback(const mobile_platform::Vels::ConstPtr& msg)
+void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &twist)
 {
-    //Transform velocities to rev/sec
-    float Rvel = msg->R_vel / 60.0;
-    float Lvel = msg->L_vel / 60.0;
-    ROS_INFO("New vel R: [%.2f] L:[%.2f] RPM", Rvel, Lvel);
-    motor_R.sendVelocity(Rvel);
-    motor_L.sendVelocity(Lvel);
+    float Rvel;
+    float Lvel;
+    //Transform twist to velocity wheels
+    twistToWheelsVels(twist->linear.x, twist->angular.z, &Rvel, &Lvel);
+
+    //Send the velocities to the motors
+    ROS_INFO("New vel R: [%.2f] L:[%.2f] RPS", Rvel, Lvel);
+    motor_R.sendVelocity(Rvel); //Positive CW
+    motor_L.sendVelocity(Lvel); //Positive CCW
 }
 
 int main(int argc, char **argv)
 {
-    
+
     //Open the comport
     cout << "Openning COM Port..." << endl;
     int portState = SmartMotor::openPort(portN, 115200); //Serial Port ID (Port Id = 16 for ttyS0) and baud rate 115200
@@ -72,18 +105,18 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
 
     //Tell the master we are going to publish a message of type Vels
-    ros::Publisher pub = n.advertise<mobile_platform::Vels>("curr_vel", 100);
+    ros::Publisher pub = n.advertise<geometry_msgs::Twist>("mob_plat/curr_vel", 100);
 
     //Also tell the master we will subscribe to a message of type Vels
-    ros::Subscriber sub = n.subscribe("cmd_vel", 1000, cmdVelCallback);
+    ros::Subscriber sub = n.subscribe("mob_plat/cmd_vel", 1000, cmdVelCallback);
 
     cout << "Waiting for new velocity command...\n";
 
     //Set the loop rate
     ros::Rate loop_rate(30);
 
-    //Instatiate the velocities message
-    mobile_platform::Vels vels_msg;
+    //Instatiate the twist message
+    geometry_msgs::Twist twist;
 
     //Send the velocity
     while (ros::ok())
@@ -91,12 +124,18 @@ int main(int argc, char **argv)
         //Update velocities
         motor_R.updateVel();
         motor_L.updateVel();
-        vels_msg.R_vel = motor_R.getVelocity();
-        vels_msg.L_vel = motor_L.getVelocity();
 
-        pub.publish(vels_msg); //Send the message
-        ros::spinOnce();      //Check for callbacks
-        loop_rate.sleep();    //Sleep until getting to the given rate
+        float linearVel, angularVel;
+
+        //Transform wheel velocities to twist
+        wheelsVelsToTwist(motor_R.getVelocity(), motor_L.getVelocity(), &linearVel, &angularVel);
+
+        twist.linear.x = linearVel;
+        twist.angular.z = angularVel;
+
+        pub.publish(twist); //Send the message
+        ros::spinOnce();    //Check for callbacks
+        loop_rate.sleep();  //Sleep until getting to the given rate
     }
 
     cout << "\nStopping the motors...\n";
